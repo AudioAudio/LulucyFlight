@@ -1,27 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#efe9f6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Lulucy's Flight</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Dodum&display=swap">
 <style>
-/* Layout: 9:16 게임 캔버스 하나를 화면 가운데에 크게. 라벤더·피치 하늘 톤 */
+/* Layout: 보이는 화면 안에 들어가는 가장 큰 9:16 영역에 게임을 꽉 채움(주소창 변화·회전에 자동 대응) */
 :root {
   --bg: #efe9f6;
   --line: #d3cbe6;
+  --gut: 16px;                      /* 화면 가장자리 여백 */
+  --vh: 100dvh;                     /* 실제로 보이는 높이(모바일 주소창 반영) */
   color-scheme: light;
 }
-html, body { height: 100%; }
+@supports not (height: 100dvh) { :root { --vh: 100vh; } }
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   margin: 0; background: var(--bg);
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 16px; box-sizing: border-box;
+  padding-left: max(var(--gut), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--gut), env(safe-area-inset-right, 0px));
+  padding-block: var(--gut); box-sizing: border-box; min-height: var(--vh); height: var(--vh);
   display: flex; justify-content: center; align-items: center;
 }
-.stage { height: min(100%, 860px); aspect-ratio: 9 / 16; max-width: 100%; }
-canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 10px; touch-action: none; cursor: pointer; background: #c9c2ea; box-shadow: 0 10px 30px rgba(120, 105, 170, .18); -webkit-user-select: none; user-select: none; }
-@media (max-width: 480px) { body { padding-block: 8px; } .stage { height: auto; width: 100%; } }
+.stage {
+  /* 폭 제한과 높이 제한 중 작은 쪽에 맞춤 → 항상 화면 안에 꽉 차게 */
+  --availW: calc(100vw - 2 * max(var(--gut), env(safe-area-inset-left, 0px)));
+  --availH: calc(var(--vh) - 2 * var(--gut) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  width: min(var(--availW), calc(var(--availH) * 9 / 16));
+  aspect-ratio: 9 / 16; max-width: 100%;
+}
+canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 10px; touch-action: none; cursor: pointer; background: #c9c2ea; box-shadow: 0 10px 30px rgba(120, 105, 170, .18); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+@media (max-width: 600px), (max-height: 600px) {      /* 폰: 여백·테두리 최소화 */
+  :root { --gut: 4px; }
+  canvas { border: 0; border-radius: 6px; box-shadow: none; }
+}
 </style>
+</head>
+<body>
 
 <div class="stage"><canvas id="game" aria-label="Lulucy's Flight 게임 화면"></canvas></div>
 
@@ -877,3 +899,5 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
   reset(true); requestAnimationFrame(loop);
 })();
 </script>
+</body>
+</html>
