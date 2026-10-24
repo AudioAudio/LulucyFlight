@@ -42,7 +42,9 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
   const DEFAULTS = { reachScore: 40, bgmVol: 32, sfxVol: 50 };   // 난이도 최종 도달 점수 40, 사운드 기준 음량(BGM 버스 0.32, 효과음 50%)
   const cfg = { ...FIXED, ...DEFAULTS, hitbox: false, god: false };
   const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
-  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  // 렌더 해상도 고정 720×1280: 게임 좌표(360×640)는 그대로 두고 내부 픽셀만 항상 2배로 그림(기기 화면 밀도와 무관).
+  // 아트 리소스가 2배(720×1280) 기준으로 제작되어 1:1로 표시됨. 물리·충돌·난이도 값은 영향 없음
+  const DPR = 2;
   cvs.width = W * DPR; cvs.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.imageSmoothingQuality = 'high';
