@@ -449,10 +449,30 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
   }
   function hitRect() { return { x: bird.x - bird.hw / 2, y: bird.y - bird.hh / 2 + 4, w: bird.hw, h: bird.hh }; }
   function hit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+  // ---------- 충돌 줌인 연출 ----------
+  // 충돌 순간 0.12초 동안 1.16배로 당겨 들어가고, 히트스톱 동안 유지, 떨어지기 시작하면 0.45초에 걸쳐 원래 크기로
+  const ZOOM = { amount: .16, inT: .12, holdT: .30, outT: .45 };
+  const zoomFocus = { x: W / 2, y: H / 2 };
+  const easeOut = x => 1 - Math.pow(1 - x, 3), easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  function zoomLevel() {
+    if (state !== 'dead') return 0;
+    const t = deadT, { inT, holdT, outT } = ZOOM;
+    if (t < inT) return easeOut(t / inT);
+    if (t < holdT) return 1;
+    if (t < holdT + outT) return 1 - easeInOut((t - holdT) / outT);
+    return 0;
+  }
+  function applyZoom() {                                      // 화면 밖 빈 공간이 보이지 않도록 초점을 화면 안쪽으로 제한
+    const k = zoomLevel(); if (k <= 0) return;
+    const z = 1 + ZOOM.amount * k, vw = W / z, vh = H / z;
+    const left = Math.max(0, Math.min(W - vw, zoomFocus.x - vw / 2)), top = Math.max(0, Math.min(H - vh, zoomFocus.y - vh / 2));
+    ctx.scale(z, z); ctx.translate(-left, -top);
+  }
   function die() {
     if (cfg.god) return;
     state = 'dead'; flash = .3; deadT = 0; bird.vy = 0;
     deadPhase = 'stop'; hitStop = .26; shake = .3; popT = 0;
+    zoomFocus.x = bird.x + 14; zoomFocus.y = bird.y;          // 충돌 지점(캐릭터 앞쪽)으로 줌
     for (let i = 0; i < 8; i++) feather(bird.x, bird.y, (Math.random() - .5) * 220, -Math.random() * 200);
     newBest = score > best;
     if (newBest) { best = score; store.set('lulusi-best', best); }
@@ -767,6 +787,7 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
   function draw() {
     ctx.save();
     if (shake > 0) { const m = shake * 22; ctx.translate((Math.random() - .5) * m, (Math.random() - .5) * m); }
+    applyZoom();
     if (ok('sky')) ctx.drawImage(im('sky'), -12, -12, W + 24, H + 24); else ctx.drawImage(sky, -12, -12, W + 24, H + 24);
     if (!ok('sky')) for (const s of twinkles) {
       const a = .3 + .5 * Math.abs(Math.sin(t * 1.5 + s.p));
