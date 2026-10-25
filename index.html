@@ -35,7 +35,21 @@ body {
   --availH: calc(var(--vh) - 2 * var(--gut) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   width: min(var(--availW), calc(var(--availH) * 9 / 16));
   aspect-ratio: 9 / 16; max-width: 100%;
+  position: relative; container-type: inline-size;
 }
+/* 랭킹 닉네임 입력 창: 캔버스 위에 겹치는 HTML 폼(모바일 키보드 입력용) */
+.name-dlg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(60, 48, 104, .46); border-radius: 10px; font-family: "Gowun Dodum", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+.name-dlg[hidden] { display: none; }
+.name-card { width: 80%; box-sizing: border-box; display: grid; gap: 3cqw; padding: 6cqw 5cqw 4.5cqw; text-align: center; color: #4a4466; background: #fdfaff; border: 1.5px solid #d4b062; border-radius: 4cqw; box-shadow: 0 10px 30px rgba(60, 48, 104, .3); font-size: 15px; font-size: 4.2cqw; }
+.name-card h2 { margin: 0; font-family: Cinzel, "Gowun Dodum", serif; font-weight: 700; font-size: 1.45em; color: #6a5ca8; letter-spacing: .02em; }
+.name-card p { margin: 0; line-height: 1.55; color: #6b6290; white-space: pre-line; }
+.name-card input { width: 100%; box-sizing: border-box; font: inherit; font-size: max(16px, 1.1em); padding: .6em .8em; border: 1.5px solid #cfc5ea; border-radius: 99px; background: #f6f2fd; color: #3b3466; text-align: center; outline: none; }
+.name-card input:focus { border-color: #8c82bd; background: #fff; }
+.name-card .err { min-height: 1.3em; color: #c0506e; font-size: .9em; }
+.name-card .btns { display: flex; gap: 2.5cqw; }
+.name-card button { flex: 1; font: inherit; padding: .7em 0; border-radius: 99px; cursor: pointer; border: 1.5px solid #d3cbe6; background: #f3effa; color: #4a4466; }
+.name-card button[type=submit] { border-color: #7469ac; background: linear-gradient(#8576c4, #6a5ca8); color: #fff; }
+.name-card button:focus-visible, .name-card input:focus-visible { outline: 2px solid #8c82bd; outline-offset: 2px; }
 canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 10px; touch-action: none; cursor: pointer; background: #c9c2ea; box-shadow: 0 10px 30px rgba(120, 105, 170, .18); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 @media (max-width: 600px), (max-height: 600px) {      /* 폰: 여백·테두리 최소화 */
   :root { --gut: 4px; }
@@ -45,7 +59,18 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
 </head>
 <body>
 
-<div class="stage"><canvas id="game" aria-label="Lulucy's Flight 게임 화면"></canvas></div>
+<div class="stage">
+  <canvas id="game" aria-label="Lulucy's Flight 게임 화면"></canvas>
+  <div class="name-dlg" id="nameDlg" hidden>
+    <form class="name-card" id="nameForm" autocomplete="off">
+      <h2>Ranking</h2>
+      <p id="nameMsg"></p>
+      <input id="nameInput" type="text" maxlength="10" enterkeyhint="done" placeholder="닉네임 (최대 10자)" aria-label="닉네임">
+      <p class="err" id="nameErr" role="alert"></p>
+      <div class="btns"><button type="button" id="nameSkip">건너뛰기</button><button type="submit">등록</button></div>
+    </form>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -435,6 +460,7 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
 
   function update(dt) {
     if (ui.press.t > 0) ui.press.t -= dt;                                   // UI 타이머는 일시정지 중에도 진행(설정 팝업 등장 연출)
+    if (rk.open) rk.t = Math.min(1, rk.t + dt * 5);
     if (ui.countdown > 0) {                                                 // 재개 카운트다운: 숫자가 바뀔 때마다 짧은 효과음, 0이 되면 재개
       ui.countdown -= dt;
       const n = Math.ceil(Math.max(0, ui.countdown));
@@ -660,7 +686,8 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
       ctx.shadowColor = 'transparent'; ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, bh - 4, bh / 2 - 2); ctx.stroke();
       txt('탭해서 다시 하기', 0, 1, 16, { font: FONT_K, weight: 400, color: '#ffffff', stroke: false });
       ctx.restore();
-    }
+      ctx.save(); ctx.globalAlpha = a; drawResultRank(py, ph); ctx.restore();
+    } else { rk.goBtn = null; rk.statusBox = null; }
   }
 
   // ---------- 타이틀 화면 ----------
@@ -690,6 +717,7 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
         ctx.restore();
       }
     }
+    if (ok('tbg')) drawRankButton();                                          // 6-1 랭킹 버튼
     if (ui.settings) drawSettings();                                          // 7 설정 팝업
   }
   // 설정 팝업 버튼 영역 (논리 px)
@@ -811,7 +839,220 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
       }
     }
     if (ui.settings && state !== 'title') drawSettings();
+    if (rk.open) drawRanking();
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 2})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+
+  // ---------- 온라인 랭킹 (Cloudflare Worker) ----------
+  // POST /score {name, score} → 점수 등록, GET /top → [{name, score}, ...] TOP 10
+  // 등록 시점: 게임오버 팝업이 뜬 뒤, 이번 점수가 지금까지 이 기기에서 등록한 최고 점수보다 높을 때만(같은 기록 반복 등록 방지)
+  // Lulucy's Flight 닉네임 필터 (게임·서버 공용으로 쓸 수 있게 독립 함수로 작성)
+  // checkNickname(name) → { ok: true } | { ok: false, reason: 'empty'|'long'|'banned'|'reserved' }
+  const NICK = (() => {
+    // 한글 비속어·혐오 표현 (자모 단위로 비교 → 자모 분리·쌍자음 우회도 잡음)
+    const KO = ['시발', '씨발', '씨바', '시바알', '씨빨', '시빨', '씌발', '쓰발', '쓰바', '쉬발', '슈발', '시팔', '씨팔', '씨펄', '십발', '십팔놈', '십새',
+      '씹', '좆', '좃같', '존나', '졸라', '존니', '병신', '븅신', '빙신', '병싄', '등신', '머저리',
+      '개새', '개색', '개세끼', '새끼', '새기', '색기', '섀끼', '쌔끼', '개같', '개년', '개놈', '개자식', '개잡', '개소리', '개씹',
+      '썅', '쌍년', '쌍놈', '썅년', '썅놈', '걸레년', '창녀', '창년', '화냥', '갈보',
+      '니미', '느금', '니애미', '니앰', '느그애미', '애미', '애비', '엄창', '엠창', '니엄마', '느개비',
+      '지랄', '염병', '옘병', '엿먹', '꺼져', '닥쳐', '닥치', '뒤져', '뒈져', '디져', '죽어라', '자살',
+      '미친놈', '미친년', '미친새', '또라이', '돌아이', '정신병자', '찐따', '쓰레기새',
+      '섹스', '쎅스', '섹1스', '보지', '자지', '잠지', '보짓', '자짓', '젖꼭', '딸딸', '자위', '야동', '포르노', '강간', '성폭', '몸캠', '조건만남', '원조교제',
+      '한남충', '한녀', '김치녀', '된장녀', '맘충', '틀딱', '급식충', '일베', '메갈', '워마드', '흑형', '짱깨', '쪽발', '쪽바리',
+      '마약', '대마초', '필로폰', '도박'];
+    // 초성·자음 축약 (입력한 자음이 연달아 있을 때만 검사 → '갓불' 같은 정상 단어는 통과)
+    const CHO = ['ㅅㅂ', 'ㅆㅂ', 'ㅄ', 'ㅂㅅ', 'ㅈㄹ', 'ㅈㄴ', 'ㄲㅈ', 'ㄷㅊ', 'ㅁㅊ', 'ㄴㄱㅁ', 'ㅅㅂㄹㅁ', 'ㅆㄹㄱ', 'ㅈ같', 'ㅗ'];
+    // 영어 (긴 단어는 부분 일치, 짧아서 다른 단어 속에 흔한 것은 이름 전체가 그 단어일 때만)
+    const EN_SUB = ['fuck', 'fuk', 'fck', 'shit', 'bitch', 'asshole', 'cunt', 'nigger', 'nigga', 'faggot', 'motherf', 'whore', 'slut', 'porn', 'pussy', 'penis', 'vagina', 'dildo', 'hitler', 'nazi', 'retard', 'bastard', 'sibal', 'ssibal', 'shibal', 'byungsin', 'gaesaekki'];
+    const EN_WORD = ['sex', 'dick', 'cock', 'rape', 'fag', 'tits', 'anal', 'stfu', 'wtf', 'kys', 'cum', 'jot', 'jiral'];
+    // 숫자·영문을 섞은 한글 욕 우회
+    const MIX = ['c발', 'c8', 'ㅅ8', 'ㅆ8', '씨8', '시8', '18놈', '18년', '개18', 'ㅅ1ㅂ', 'ㅆ1ㅂ', 'tlqkf', 'qudtls', 'wlfkf', 'whssk', 'rotoRl'.toLowerCase()];
+    // 운영진 사칭 방지
+    const RESERVED = ['관리자', '운영자', '운영진', '개발자', '공지사항', '시스템', 'admin', 'administrator', 'moderator', 'system', 'official', 'soop', '숲운영', '아프리카tv'];
+    // 정상 단어 속에 우연히 들어간 경우 허용 (검사 전에 지움)
+    const ALLOW = ['시발점', '시발역', '시발택시', '새끼손가락', '새끼발가락', '보지마', '보지않', '안보지', '애비뉴', '니미츠', '개새우', '졸라맨', '자지러', '시바견', '시바이누'];
+
+    const L = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ', V = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ',
+      T = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+    const SOFT = { 'ㄲ': 'ㄱ', 'ㄸ': 'ㄷ', 'ㅃ': 'ㅂ', 'ㅆ': 'ㅅ', 'ㅉ': 'ㅈ', 'ㅢ': 'ㅣ', 'ㅟ': 'ㅣ', 'ㅝ': 'ㅓ', 'ㅞ': 'ㅔ', 'ㅙ': 'ㅐ', 'ㅚ': 'ㅐ', 'ㅖ': 'ㅔ', 'ㅒ': 'ㅐ' };
+    const LEET = { '0': 'o', '1': 'i', '!': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '+': 't' };
+    const jamo = s => [...s].map(c => {
+      const k = c.charCodeAt(0) - 0xAC00;
+      if (k < 0 || k > 11171) return SOFT[c] || c;
+      const t = T[k % 28], j = L[Math.floor(k / 588)] + V[Math.floor(k % 588 / 28)] + t;
+      return [...j].map(x => SOFT[x] || x).join('');
+    }).join('');
+    // NFKC는 전각·특수 문자를 정리하지만 한글 자음(ㅅ)을 조합용 자모로 바꿔 버리므로 한글 자모는 그대로 둠
+    const base = s => [...s].map(c => /[\u3131-\u318E\uAC00-\uD7A3]/.test(c) ? c : c.normalize('NFKC')).join('').toLowerCase();
+    const keepKo = s => s.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-z]/g, '');                      // 숫자·기호·공백 제거
+    const keepAll = s => s.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-z0-9]/g, '');                 // 숫자는 남김(c8 같은 우회용)
+    const strip = (s, list) => list.reduce((a, w) => a.split(w).join(''), s);
+    const KO_J = KO.map(w => jamo(w)), CHO_N = CHO.map(w => [...w].map(x => SOFT[x] || x).join(''));
+
+    function check(raw) {
+      const name = String(raw ?? '').replace(/\s+/g, ' ').trim();
+      if (!name) return { ok: false, reason: 'empty' };
+      const b = base(name);
+      const ko = strip(keepKo(b), ALLOW), mix = strip(keepAll(b), ALLOW);
+      const en = keepKo([...b].map(c => LEET[c] || c).join(''));                    // 영어는 leet 치환 후 비교
+      if (RESERVED.some(w => { const r = keepKo(base(w)); return r && (ko.includes(r) || mix.includes(keepAll(base(w))) || en.includes(r)); })) return { ok: false, reason: 'reserved' };
+      const kj = jamo(ko);
+      if (KO_J.some(w => kj.includes(w))) return { ok: false, reason: 'banned' };
+      const choOnly = [...ko].map(x => SOFT[x] || x).join('');
+      if (CHO_N.some(w => choOnly.includes(w))) return { ok: false, reason: 'banned' };
+      if (MIX.some(w => mix.includes(w))) return { ok: false, reason: 'banned' };
+      if (EN_SUB.some(w => en.includes(w))) return { ok: false, reason: 'banned' };
+      const words = b.split(/[^a-z0-9]+/).filter(Boolean).map(w => keepKo([...w].map(c => LEET[c] || c).join('')));
+      if (EN_WORD.some(w => en === w || words.includes(w))) return { ok: false, reason: 'banned' };
+      if ([...name].length > 10) return { ok: false, reason: 'long' };          // 길이는 마지막에(표시용 검사에서 금칙어 여부를 먼저 판단)
+      return { ok: true };
+    }
+    return { check };
+  })();
+  const RANK_API = 'https://lulucy-ranking.jinthesurge.workers.dev';
+  const NAME_MAX = 10;
+  const rk = { open: false, t: 0, loading: false, list: null, err: '', status: '', handled: false, pendingScore: 0,
+    name: (n => n && NICK.check(n).ok ? n : '')(store.get('lulusi-name') || ''), sent: +store.get('lulusi-rank-sent') || 0, dlg: null, goBtn: null, statusBox: null };
+  function fetchT(url, opt = {}, ms = 7000) {               // 응답이 없으면 7초 뒤 포기
+    const c = new AbortController(), id = setTimeout(() => c.abort(), ms);
+    return fetch(url, { ...opt, signal: c.signal }).finally(() => clearTimeout(id));
+  }
+  const netErr = () => navigator.onLine === false ? '인터넷 연결을 확인해 주세요' : '랭킹 서버에 연결하지 못했어요';
+  async function rankSubmit(sc) {
+    rk.status = 'sending'; rk.pendingScore = sc;
+    try {
+      const r = await fetchT(RANK_API + '/score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: rk.name, score: sc }) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      rk.status = 'sent'; rk.list = null;
+      if (sc > rk.sent) { rk.sent = sc; store.set('lulusi-rank-sent', String(sc)); }
+    } catch (e) { rk.status = 'fail'; console.warn('[LULUSI] 랭킹 등록 실패:', e); }
+  }
+  async function rankLoad() {
+    rk.loading = true; rk.err = '';
+    try {
+      const r = await fetchT(RANK_API + '/top');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json(); if (!Array.isArray(j)) throw new Error('응답 형식 오류');
+      rk.list = j.slice(0, 10).map(e => ({ name: (n => !n ? '???' : ['banned', 'reserved'].includes(NICK.check(n).reason) ? '(가려진 닉네임)' : n)(String(e?.name ?? '').trim().slice(0, 16)), score: Math.max(0, Math.floor(Number(e?.score) || 0)) }));
+    } catch (e) { rk.err = netErr(); console.warn('[LULUSI] 랭킹 불러오기 실패:', e); }
+    finally { rk.loading = false; }
+  }
+  function openRanking() { rk.open = true; rk.t = 0; sfx('select'); rankLoad(); }
+  function closeRanking() { rk.open = false; sfx('back'); }
+  // 닉네임 입력 창(HTML 폼)
+  const nameDlg = document.getElementById('nameDlg'), nameInput = document.getElementById('nameInput'),
+    nameMsg = document.getElementById('nameMsg'), nameErr = document.getElementById('nameErr');
+  function askName(reason, sc) {
+    rk.dlg = { reason, sc };
+    nameMsg.textContent = reason === 'submit' ? `이번 기록 ${sc}점을 랭킹에 올려요.\n랭킹에 표시할 닉네임을 정해 주세요.` : '랭킹에 표시할 닉네임을 정해 주세요.\n다음 기록부터 적용돼요.';
+    document.getElementById('nameSkip').textContent = reason === 'submit' ? '건너뛰기' : '취소';
+    nameInput.value = rk.name; nameErr.textContent = ''; nameDlg.hidden = false;
+    setTimeout(() => { try { nameInput.focus(); nameInput.select(); } catch {} }, 50);
+  }
+  function closeName() { nameDlg.hidden = true; rk.dlg = null; nameInput.blur(); }
+  document.getElementById('nameForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = nameInput.value.replace(/\s+/g, ' ').trim();
+    const chk = NICK.check(v);
+    if (!chk.ok) {
+      nameErr.textContent = { empty: '닉네임을 입력해 주세요', long: `닉네임은 ${NAME_MAX}자까지 쓸 수 있어요`,
+        banned: '사용할 수 없는 표현이 들어 있어요', reserved: '운영진으로 오해할 수 있는 닉네임은 쓸 수 없어요' }[chk.reason];
+      nameInput.focus(); return;
+    }
+    rk.name = v; store.set('lulusi-name', v);
+    const d = rk.dlg; closeName(); sfx('select');
+    if (d && d.reason === 'submit') rankSubmit(d.sc);
+  });
+  document.getElementById('nameSkip').addEventListener('click', () => {
+    const d = rk.dlg; closeName(); sfx('back');
+    if (d && d.reason === 'submit') rk.status = 'skipped';
+  });
+  nameInput.addEventListener('input', () => { nameErr.textContent = ''; });
+  nameDlg.addEventListener('pointerdown', e => { if (e.target === nameDlg) nameInput.blur(); });
+  function rankTick() {                                      // 게임오버 시 자동 등록(한 판에 한 번)
+    if (state === 'dead') {
+      if (!rk.handled && deadPhase === 'popup' && popT > .9) {
+        rk.handled = true;
+        const sc = score;
+        if (sc > 0 && sc > rk.sent && !cfg.god) { if (rk.name) rankSubmit(sc); else askName('submit', sc); }
+      }
+    } else if (rk.handled) { rk.handled = false; rk.status = ''; }
+  }
+  // 랭킹 팝업 (논리 px)
+  const RANK = { panel: [28, 86, 304, 468], retry: [118, 318, 124, 36], name: [44, 470, 272, 34], close: [100, 512, 160, 30] };
+  const TITLE_RANK = [301, 498, 46, 46];                    // 타이틀 랭킹 버튼(Tap to Start 오른쪽, 사운드 버튼 위)
+  function fitText(s, maxW, size, font) {                   // 긴 닉네임은 말줄임
+    ctx.font = `400 ${size}px ${font}`; if (ctx.measureText(s).width <= maxW) return s;
+    let t = [...s]; while (t.length > 1 && ctx.measureText(t.join('') + '…').width > maxW) t.pop(); return t.join('') + '…';
+  }
+  function crown(cx, cy, s, col) {
+    ctx.fillStyle = col; ctx.beginPath();
+    ctx.moveTo(cx - s, cy + s * .6); ctx.lineTo(cx - s, cy - s * .35); ctx.lineTo(cx - s * .45, cy + s * .05); ctx.lineTo(cx, cy - s * .7);
+    ctx.lineTo(cx + s * .45, cy + s * .05); ctx.lineTo(cx + s, cy - s * .35); ctx.lineTo(cx + s, cy + s * .6); ctx.closePath(); ctx.fill();
+  }
+  function drawRankButton() {                               // 타이틀 화면 랭킹 버튼
+    const [x, y, w, h] = TITLE_RANK, cx = x + w / 2, cy = y + h / 2, s = pressScale('rank');
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
+    const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, '#b3a6e6'); g.addColorStop(1, '#8476c6');
+    ctx.shadowColor = 'rgba(72,56,119,.3)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, w / 2 - 3, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = '#e3c27a'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, w / 2 - 7, 0, Math.PI * 2); ctx.stroke();
+    crown(0, -1, 10, '#ffffff');
+    ctx.restore();
+    txt('RANK', cx, y + h + 6, 9, { color: '#ffffff', strokeColor: 'rgba(106,92,168,.9)', lw: 3 });
+  }
+  function drawResultRank(py, ph) {                         // 게임오버 팝업 아래: 랭킹 버튼 + 등록 상태
+    const b = rk.goBtn = [W / 2 - 64, py + ph + 14, 128, 32], s = pressScale('gorank');
+    ctx.save(); ctx.translate(b[0] + b[2] / 2, b[1] + b[3] / 2); ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(253,250,255,.95)'; ctx.strokeStyle = '#d4b062'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(-b[2] / 2, -b[3] / 2, b[2], b[3], b[3] / 2); ctx.fill(); ctx.stroke();
+    crown(-34, 0, 7, '#c9a24c');
+    txt('랭킹 보기', 8, 1, 14, { font: FONT_K, weight: 400, color: '#4a4466', stroke: false });
+    ctx.restore();
+    const msg = { sending: '랭킹에 등록하는 중…', sent: '랭킹에 등록했어요!', fail: '등록 실패 · 눌러서 다시 시도', skipped: '' }[rk.status] || '';
+    rk.statusBox = msg ? [W / 2 - 130, b[1] + b[3] + 6, 260, 24] : null;
+    if (msg) txt(msg, W / 2, b[1] + b[3] + 18, 13, { font: FONT_K, weight: 400, color: rk.status === 'fail' ? '#ffd6de' : '#ffffff', strokeColor: 'rgba(74,62,120,.85)', lw: 4 });
+  }
+  function drawRanking() {
+    const k = easeOutBack(rk.t);
+    ctx.fillStyle = `rgba(60,48,104,${.5 * rk.t})`; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(W / 2, 320); ctx.scale(.86 + .14 * k, .86 + .14 * k); ctx.translate(-W / 2, -320); ctx.globalAlpha = Math.min(1, rk.t * 1.6);
+    const [px, py, pw, ph] = RANK.panel; panel(px, py, pw, ph);
+    crown(W / 2, py + 30, 9, '#c9a24c');
+    txt('랭킹 TOP 10', W / 2, py + 56, 20, { font: FONT_K, weight: 400, color: '#6a5ca8', stroke: false });
+    ctx.fillStyle = 'rgba(212,176,98,.5)'; ctx.fillRect(px + 40, py + 76, pw - 80, 1);
+    const top = py + 92, rowH = 30;
+    if (rk.loading && !rk.list) {
+      txt('불러오는 중…', W / 2, top + 120, 15, { font: FONT_K, weight: 400, color: '#847da0', stroke: false });
+    } else if (rk.err && !rk.list) {
+      txt(rk.err, W / 2, top + 90, 15, { font: FONT_K, weight: 400, color: '#847da0', stroke: false });
+      pill(RANK.retry, '다시 시도', true, 'rk-retry');
+    } else if (rk.list && rk.list.length === 0) {
+      txt('아직 기록이 없어요', W / 2, top + 100, 16, { font: FONT_K, weight: 400, color: '#6b6290', stroke: false });
+      txt('첫 번째 기록의 주인공이 되어 보세요!', W / 2, top + 128, 13, { font: FONT_K, weight: 400, color: '#9a92b8', stroke: false });
+    } else if (rk.list) {
+      const MED = ['#d9b04f', '#aaa6c0', '#c8926a'];
+      rk.list.forEach((e, i) => {
+        const y = top + i * rowH, mine = rk.name && e.name === rk.name;
+        if (mine) { ctx.fillStyle = '#f0ebfb'; ctx.beginPath(); ctx.roundRect(px + 14, y - rowH / 2 + 2, pw - 28, rowH - 4, 8); ctx.fill(); }
+        if (i < 3) { ctx.fillStyle = MED[i]; ctx.beginPath(); ctx.arc(px + 34, y, 11, 0, Math.PI * 2); ctx.fill(); txt(String(i + 1), px + 34, y + 1, 12, { color: '#ffffff', stroke: false }); }
+        else txt(String(i + 1), px + 34, y + 1, 13, { color: '#9a92b8', stroke: false });
+        txt(fitText(e.name, 150, 15, FONT_K), px + 56, y + 1, 15, { font: FONT_K, weight: 400, color: mine ? '#4e4190' : '#4a4466', stroke: false, align: 'left' });
+        txt(String(e.score), px + pw - 26, y + 1, 17, { color: mine ? '#4e4190' : '#3b3466', stroke: false, align: 'right' });
+      });
+    }
+    ctx.fillStyle = 'rgba(212,176,98,.35)'; ctx.fillRect(px + 30, RANK.name[1] - 10, pw - 60, 1);
+    pill(RANK.name, rk.name ? `닉네임: ${fitText(rk.name, 120, 15, FONT_K)}  ·  변경` : '닉네임 정하기', false, 'rk-name');
+    txt('닫기', W / 2, RANK.close[1] + 16, 14, { font: FONT_K, weight: 400, color: '#847da0', stroke: false });
+    ctx.restore();
+  }
+  function rankInput(p) {                                   // 랭킹 팝업이 열려 있을 때의 입력
+    if (rk.err && !rk.list && !rk.loading && inBox(p, RANK.retry, 4)) { press('rk-retry'); sfx('select'); rankLoad(); return; }
+    if (inBox(p, RANK.name, 4)) { press('rk-name'); sfx('select'); askName('change'); return; }
+    if (inBox(p, RANK.close, 8) || !inBox(p, RANK.panel)) closeRanking();
   }
 
   // 고정 타임스텝 루프
@@ -819,7 +1060,7 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
   function loop(now) {
     acc += Math.min(.1, (now - last) / 1000); last = now;
     while (acc >= STEP) { update(STEP); acc -= STEP; }
-    draw(); audioTick(); requestAnimationFrame(loop);
+    draw(); audioTick(); rankTick(); requestAnimationFrame(loop);
   }
 
   // 입력
@@ -870,13 +1111,18 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
     if (!ok('tbg')) return false;
     if (inBox(p, TITLE.settings, BTN_PAD)) { press('settings'); sfx('select'); ui.settings = true; ui.settingsT = 0; return true; }
     if (inBox(p, TITLE.sound, BTN_PAD)) { press('sound'); if (toggleAllSound()) sfx('select'); return true; }
+    if (inBox(p, TITLE_RANK, BTN_PAD)) { press('rank'); openRanking(); return true; }
     if (inBox(p, TITLE.tap_to_start)) press('tap');
     return false;                            // 나머지 화면 영역과 Tap to Start = 게임 시작
   }
   cvs.addEventListener('pointerdown', e => {
     e.preventDefault(); audioInit();
     const r = cvs.getBoundingClientRect(), p = { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+    if (rk.dlg) return;                                                           // 닉네임 입력 중
+    if (rk.open) { rankInput(p); return; }                                        // 랭킹 팝업
     if (state === 'title') { if (!titleInput(p)) startFromTitle(); return; }
+    if (state === 'dead' && rk.goBtn && inBox(p, rk.goBtn, 4)) { press('gorank'); openRanking(); return; }          // 결과 화면 랭킹 버튼
+    if (state === 'dead' && rk.statusBox && rk.status === 'fail' && inBox(p, rk.statusBox)) { sfx('select'); rankSubmit(rk.pendingScore); return; }
     if (ui.settings) { settingsInput(p); return; }                              // 플레이 중 설정 팝업
     if (optVisible() && !(ui.countdown > 0) && inBox(p, OPT_BTN, BTN_PAD)) { openIngameOptions(); return; }   // 카운트다운 중엔 버튼 숨김·무시
     if (paused && state === 'play') { if (ui.countdown <= 0) startCountdown(); return; }   // 일시정지 중 탭 = 3·2·1 후 재개(날갯짓 없이)
@@ -884,6 +1130,8 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
   });
   addEventListener('keydown', e => {
     audioInit();
+    if (rk.dlg || (e.target && e.target.tagName === 'INPUT')) { if (e.code === 'Escape' && rk.dlg) document.getElementById('nameSkip').click(); return; }   // 닉네임 입력 중엔 게임 조작 안 함
+    if (rk.open) { if (e.code === 'Escape' || e.code === 'Space') { e.preventDefault(); closeRanking(); } return; }
     if (ui.settings) { if (e.code === 'Escape' || e.code === 'Space') { e.preventDefault(); ui.settings = false; sfx('back'); } return; }
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
       e.preventDefault();
