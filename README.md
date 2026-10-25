@@ -24,7 +24,7 @@
 | Esc | 설정창 닫기 |
 
 ## 온라인 랭킹
-- 서버: `https://lulucy-ranking.jinthesurge.workers.dev` (`RANK_API` 상수)
+- 서버: `https://lfranking.jinthesurge.workers.dev` (`RANK_API` 상수)
 - `POST /score` `{name, score}` — 게임오버 팝업이 뜬 뒤, 이번 점수가 이 기기에서 등록한 최고 점수보다 높을 때만 1회 전송
 - `GET /top` — `[{name, score}, ...]` 상위 10개 표시
 - 처음 등록할 때 닉네임 입력(최대 10자, 브라우저에 저장). 건너뛰면 이번 기록은 등록 안 함

@@ -910,7 +910,7 @@ canvas { display: block; width: 100%; height: 100%; border: 1px solid var(--line
     }
     return { check };
   })();
-  const RANK_API = 'https://lulucy-ranking.jinthesurge.workers.dev';
+  const RANK_API = 'https://lfranking.jinthesurge.workers.dev';
   const NAME_MAX = 10;
   const rk = { open: false, t: 0, loading: false, list: null, err: '', status: '', handled: false, pendingScore: 0,
     name: (n => n && NICK.check(n).ok ? n : '')(store.get('lulusi-name') || ''), sent: +store.get('lulusi-rank-sent') || 0, dlg: null, goBtn: null, statusBox: null };
